@@ -94,7 +94,7 @@
 %endif
 
 # Numactl is not available on s390[x] and ARM
-%ifarch s390 s390x %{arm}
+%ifarch s390 s390x %{arm} riscv64
     %define with_numactl 0
 %endif
 
@@ -113,7 +113,7 @@
 %endif
 
 # zfs-fuse is not available on some architectures
-%ifarch s390 s390x aarch64
+%ifarch s390 s390x aarch64 riscv64
     %define with_storage_zfs 0
 %endif
 
@@ -188,7 +188,7 @@
 %if %{with_qemu} || %{with_lxc} || %{with_uml}
 # numad is used to manage the CPU and memory placement dynamically,
 # it's not available on s390[x] and ARM.
-    %ifnarch s390 s390x %{arm}
+    %ifnarch s390 s390x %{arm} riscv64
         %define with_numad    0%{!?_without_numad:1}
     %endif
 %endif
@@ -217,7 +217,7 @@
 Summary: Library providing a simple virtualization API
 Name: libvirt
 Version: 4.6.0
-Release: 1%{?dist}%{?extra_release}
+Release: 2%{?dist}%{?extra_release}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -1926,6 +1926,9 @@ exit 0
 
 
 %changelog
+* Sat Aug 18 2018 David Abdurachmanov <david.abdurachmanov@gmail.com> - 4.6.0-2
+- Add support for RISC-V (riscv64)
+
 * Mon Aug  6 2018 Daniel P. Berrangé <berrange@redhat.com> - 4.6.0-1
 - Update to 4.6.0 release
 
