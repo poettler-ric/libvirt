@@ -4,7 +4,7 @@
 # that's still supported by the vendor. It may work on other distros
 # or versions, but no effort will be made to ensure that going forward.
 %define min_rhel 7
-%define min_fedora 26
+%define min_fedora 27
 
 %if (0%{?fedora} && 0%{?fedora} >= %{min_fedora}) || (0%{?rhel} && 0%{?rhel} >= %{min_rhel})
     %define supported_platform 1
@@ -105,20 +105,6 @@
     %define with_numactl 0
 %endif
 
-# libgfapi is built only on x86_64 on rhel
-%ifnarch x86_64
-    %if 0%{?rhel}
-        %define with_storage_gluster 0
-    %endif
-%endif
-
-# librados and librbd are built only on x86_64 on rhel
-%ifnarch x86_64
-    %if 0%{?rhel}
-        %define with_storage_rbd 0
-    %endif
-%endif
-
 # zfs-fuse is not available on some architectures
 %ifarch s390 s390x aarch64 riscv64
     %define with_storage_zfs 0
@@ -214,16 +200,16 @@
     %define enable_werror --disable-werror
 %endif
 
-%if 0%{?fedora}
-    %define tls_priority "@LIBVIRT,SYSTEM"
-%else
+%if 0%{?rhel} == 7
     %define tls_priority "NORMAL"
+%else
+    %define tls_priority "@LIBVIRT,SYSTEM"
 %endif
 
 
 Summary: Library providing a simple virtualization API
 Name: libvirt
-Version: 4.7.0
+Version: 4.8.0
 Release: 1%{?dist}%{?extra_release}
 License: LGPLv2+
 URL: https://libvirt.org/
@@ -1933,6 +1919,9 @@ exit 0
 
 
 %changelog
+* Fri Oct  5 2018 Daniel P. Berrangé <berrange@redhat.com> - 4.8.0-1
+- Update to 4.8.0 release
+
 * Tue Sep  4 2018 Daniel P. Berrangé <berrange@redhat.com> - 4.7.0-1
 - Update to 4.7.0 release
 
