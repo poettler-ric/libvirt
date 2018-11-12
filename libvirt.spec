@@ -100,7 +100,7 @@
     %define with_vbox 0
 %endif
 
-# Numactl is not available on s390[x] and ARM
+# Numactl is not available on many non-x86 archs
 %ifarch s390 s390x %{arm} riscv64
     %define with_numactl 0
 %endif
@@ -180,7 +180,7 @@
 
 %if %{with_qemu} || %{with_lxc} || %{with_uml}
 # numad is used to manage the CPU and memory placement dynamically,
-# it's not available on s390[x] and ARM.
+# it's not available on many non-x86 architectures.
     %ifnarch s390 s390x %{arm} riscv64
         %define with_numad    0%{!?_without_numad:1}
     %endif
@@ -209,7 +209,7 @@
 
 Summary: Library providing a simple virtualization API
 Name: libvirt
-Version: 4.8.0
+Version: 4.9.0
 Release: 1%{?dist}%{?extra_release}
 License: LGPLv2+
 URL: https://libvirt.org/
@@ -1919,6 +1919,9 @@ exit 0
 
 
 %changelog
+* Mon Nov 12 2018 Daniel P. Berrangé <berrange@redhat.com> - 4.9.0-1
+- Update to 4.9.0 release
+
 * Fri Oct  5 2018 Daniel P. Berrangé <berrange@redhat.com> - 4.8.0-1
 - Update to 4.8.0 release
 
