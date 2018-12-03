@@ -4,7 +4,7 @@
 # that's still supported by the vendor. It may work on other distros
 # or versions, but no effort will be made to ensure that going forward.
 %define min_rhel 7
-%define min_fedora 27
+%define min_fedora 28
 
 %if (0%{?fedora} && 0%{?fedora} >= %{min_fedora}) || (0%{?rhel} && 0%{?rhel} >= %{min_rhel})
     %define supported_platform 1
@@ -72,7 +72,7 @@
 %endif
 
 # We need a recent enough libiscsi (>= 1.18.0)
-%if 0%{?fedora} >= 28 || 0%{?rhel} > 7
+%if 0%{?fedora} || 0%{?rhel} > 7
     %define with_storage_iscsi_direct 0%{!?_without_storage_iscsi_direct:1}
 %else
     %define with_storage_iscsi_direct 0
@@ -209,7 +209,7 @@
 
 Summary: Library providing a simple virtualization API
 Name: libvirt
-Version: 4.9.0
+Version: 4.10.0
 Release: 1%{?dist}%{?extra_release}
 License: LGPLv2+
 URL: https://libvirt.org/
@@ -258,7 +258,7 @@ BuildRequires: /usr/bin/pod2man
 %endif
 BuildRequires: gcc
 BuildRequires: git
-%if 0%{?fedora} >= 27 || 0%{?rhel} > 7
+%if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires: perl-interpreter
 %else
 BuildRequires: perl
@@ -386,7 +386,7 @@ BuildRequires: wireshark-devel >= 2.1.0
 BuildRequires: libssh-devel >= 0.7.0
 %endif
 
-%if 0%{?fedora} > 27 || 0%{?rhel} > 7
+%if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires: rpcgen
 BuildRequires: libtirpc-devel
 %endif
@@ -1919,6 +1919,9 @@ exit 0
 
 
 %changelog
+* Mon Dec  3 2018 Daniel P. Berrangé <berrange@redhat.com> - 4.10.0-1
+- Update to 4.10.0 release
+
 * Mon Nov 12 2018 Daniel P. Berrangé <berrange@redhat.com> - 4.9.0-1
 - Update to 4.9.0 release
 
