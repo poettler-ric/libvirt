@@ -110,6 +110,12 @@
     %define with_storage_zfs 0
 %endif
 
+# Ceph dropping support for 32-bit hosts
+%if 0%{fedora} >= 30
+    %ifarch %{arm} %{ix86}
+        %define with_storage_rbd 0
+    %endif
+%endif
 
 # RHEL doesn't ship OpenVZ, VBox, UML, PowerHypervisor,
 # VMware, libxenserver (xenapi), libxenlight (Xen 4.1 and newer),
@@ -210,7 +216,7 @@
 Summary: Library providing a simple virtualization API
 Name: libvirt
 Version: 4.10.0
-Release: 1%{?dist}%{?extra_release}
+Release: 2%{?dist}%{?extra_release}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -1919,6 +1925,9 @@ exit 0
 
 
 %changelog
+* Mon Dec 10 2018 Daniel P. Berrangé <berrange@redhat.com> - 4.10.0-2
+- Disable RBD on 32-bit arches (rhbz #1657928)
+
 * Mon Dec  3 2018 Daniel P. Berrangé <berrange@redhat.com> - 4.10.0-1
 - Update to 4.10.0 release
 
