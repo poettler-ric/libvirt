@@ -20,7 +20,6 @@
 # The hypervisor drivers that run in libvirtd
 %define with_qemu          0%{!?_without_qemu:1}
 %define with_lxc           0%{!?_without_lxc:1}
-%define with_uml           0%{!?_without_uml:1}
 %define with_libxl         0%{!?_without_libxl:1}
 %define with_vbox          0%{!?_without_vbox:1}
 
@@ -117,13 +116,12 @@
     %endif
 %endif
 
-# RHEL doesn't ship OpenVZ, VBox, UML, PowerHypervisor,
+# RHEL doesn't ship OpenVZ, VBox, PowerHypervisor,
 # VMware, libxenserver (xenapi), libxenlight (Xen 4.1 and newer),
 # or HyperV.
 %if 0%{?rhel}
     %define with_openvz 0
     %define with_vbox 0
-    %define with_uml 0
     %define with_phyp 0
     %define with_vmware 0
     %define with_xenapi 0
@@ -184,7 +182,7 @@
 %endif
 
 
-%if %{with_qemu} || %{with_lxc} || %{with_uml}
+%if %{with_qemu} || %{with_lxc}
 # numad is used to manage the CPU and memory placement dynamically,
 # it's not available on many non-x86 architectures.
     %ifnarch s390 s390x %{arm} riscv64
@@ -215,8 +213,8 @@
 
 Summary: Library providing a simple virtualization API
 Name: libvirt
-Version: 4.10.0
-Release: 2%{?dist}%{?extra_release}
+Version: 5.0.0
+Release: 1%{?dist}%{?extra_release}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -237,9 +235,9 @@ Requires: libvirt-daemon-driver-lxc = %{version}-%{release}
 %if %{with_qemu}
 Requires: libvirt-daemon-driver-qemu = %{version}-%{release}
 %endif
-%if %{with_uml}
-Requires: libvirt-daemon-driver-uml = %{version}-%{release}
-%endif
+# We had UML driver, but we've removed it.
+Obsoletes: libvirt-daemon-driver-uml <= 5.0.0
+Obsoletes: libvirt-daemon-uml <= 5.0.0
 %if %{with_vbox}
 Requires: libvirt-daemon-driver-vbox = %{version}-%{release}
 %endif
@@ -749,19 +747,6 @@ the Linux kernel
 %endif
 
 
-%if %{with_uml}
-%package daemon-driver-uml
-Summary: Uml driver plugin for the libvirtd daemon
-Requires: libvirt-daemon = %{version}-%{release}
-Requires: libvirt-libs = %{version}-%{release}
-
-%description daemon-driver-uml
-The UML driver plugin for the libvirtd daemon, providing
-an implementation of the hypervisor driver APIs using
-User Mode Linux
-%endif
-
-
 %if %{with_vbox}
 %package daemon-driver-vbox
 Summary: VirtualBox driver plugin for the libvirtd daemon
@@ -846,26 +831,6 @@ Requires: libvirt-daemon-driver-storage = %{version}-%{release}
 %description daemon-lxc
 Server side daemon and driver required to manage the virtualization
 capabilities of LXC
-%endif
-
-
-%if %{with_uml}
-%package daemon-uml
-Summary: Server side daemon & driver required to run UML guests
-
-Requires: libvirt-daemon = %{version}-%{release}
-Requires: libvirt-daemon-driver-uml = %{version}-%{release}
-Requires: libvirt-daemon-driver-interface = %{version}-%{release}
-Requires: libvirt-daemon-driver-network = %{version}-%{release}
-Requires: libvirt-daemon-driver-nodedev = %{version}-%{release}
-Requires: libvirt-daemon-driver-nwfilter = %{version}-%{release}
-Requires: libvirt-daemon-driver-secret = %{version}-%{release}
-Requires: libvirt-daemon-driver-storage = %{version}-%{release}
-# There are no UML kernel RPMs in Fedora/RHEL to depend on.
-
-%description daemon-uml
-Server side daemon and driver required to manage the virtualization
-capabilities of UML
 %endif
 
 
@@ -1074,12 +1039,6 @@ exit 1
     %define arg_vmware --without-vmware
 %endif
 
-%if %{with_uml}
-    %define arg_uml --with-uml
-%else
-    %define arg_uml --without-uml
-%endif
-
 %if %{with_storage_rbd}
     %define arg_storage_rbd --with-storage-rbd
 %else
@@ -1193,7 +1152,6 @@ rm -f po/stamp-po
            --with-avahi \
            --with-polkit \
            --with-libvirtd \
-           %{?arg_uml} \
            %{?arg_phyp} \
            %{?arg_esx} \
            %{?arg_hyperv} \
@@ -1321,9 +1279,6 @@ rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/libvirt/libxl.conf
 rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/libvirtd.libxl
 rm -f $RPM_BUILD_ROOT%{_datadir}/augeas/lenses/libvirtd_libxl.aug
 rm -f $RPM_BUILD_ROOT%{_datadir}/augeas/lenses/tests/test_libvirtd_libxl.aug
-%endif
-%if ! %{with_uml}
-rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/libvirtd.uml
 %endif
 
 # Copied into libvirt-docs subpackage eventually
@@ -1731,15 +1686,6 @@ exit 0
 %{_libdir}/%{name}/connection-driver/libvirt_driver_lxc.so
 %endif
 
-%if %{with_uml}
-%files daemon-driver-uml
-%dir %attr(0700, root, root) %{_localstatedir}/log/libvirt/uml/
-%config(noreplace) %{_sysconfdir}/logrotate.d/libvirtd.uml
-%ghost %dir %{_localstatedir}/run/libvirt/uml/
-%dir %attr(0700, root, root) %{_localstatedir}/lib/libvirt/uml/
-%{_libdir}/%{name}/connection-driver/libvirt_driver_uml.so
-%endif
-
 %if %{with_libxl}
 %files daemon-driver-libxl
 %config(noreplace) %{_sysconfdir}/libvirt/libxl.conf
@@ -1768,10 +1714,6 @@ exit 0
 
 %if %{with_lxc}
 %files daemon-lxc
-%endif
-
-%if %{with_uml}
-%files daemon-uml
 %endif
 
 %if %{with_libxl}
@@ -1925,6 +1867,9 @@ exit 0
 
 
 %changelog
+* Mon Jan 21 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.0.0-1
+- Update to 5.0.0 release
+
 * Mon Dec 10 2018 Daniel P. Berrangé <berrange@redhat.com> - 4.10.0-2
 - Disable RBD on 32-bit arches (rhbz #1657928)
 
@@ -1979,51 +1924,3 @@ exit 0
 
 * Fri Jan 19 2018 Daniel P. Berrange <berrange@redhat.com> - 4.0.0-1
 - Rebase to version 4.0.0
-
-* Wed Dec 20 2017 Cole Robinson <crobinso@redhat.com> - 3.10.0-2
-- Rebuild for xen 4.10
-
-* Tue Dec  5 2017 Daniel P. Berrange <berrange@redhat.com> - 3.10.0-1
-- Rebase to version 3.10.0
-
-* Fri Nov  3 2017 Daniel P. Berrange <berrange@redhat.com> - 3.9.0-1
-- Rebase to version 3.9.0
-
-* Wed Oct  4 2017 Daniel P. Berrange <berrange@redhat.com> - 3.8.0-1
-- Rebase to version 3.8.0
-
-* Mon Sep  4 2017 Daniel P. Berrange <berrange@redhat.com> - 3.7.0-1
-- Rebase to version 3.7.0
-
-* Wed Aug  2 2017 Daniel P. Berrange <berrange@redhat.com> - 3.6.0-1
-- Rebase to version 3.6.0
-
-* Sun Jul 30 2017 Florian Weimer <fweimer@redhat.com> - 3.5.0-4
-- Rebuild with binutils fix for ppc64le (#1475636)
-
-* Tue Jul 25 2017 Daniel P. Berrange <berrange@redhat.com> - 3.5.0-3
-- Disabled RBD on i386, arm, ppc64 (rhbz #1474743)
-
-* Mon Jul 17 2017 Cole Robinson <crobinso@redhat.com> - 3.5.0-2
-- Rebuild for xen 4.9
-
-* Thu Jul  6 2017 Daniel P. Berrange <berrange@redhat.com> - 3.5.0-1
-- Rebase to version 3.5.0
-
-* Fri Jun  2 2017 Daniel P. Berrange <berrange@redhat.com> - 3.4.0-1
-- Rebase to version 3.4.0
-
-* Mon May  8 2017 Daniel P. Berrange <berrange@redhat.com> - 3.3.0-1
-- Rebase to version 3.3.0
-
-* Mon Apr  3 2017 Daniel P. Berrange <berrange@redhat.com> - 3.2.0-1
-- Rebase to version 3.2.0
-
-* Fri Mar  3 2017 Daniel P. Berrange <berrange@redhat.com> - 3.1.0-1
-- Rebase to version 3.1.0
-
-* Fri Feb 10 2017 Fedora Release Engineering <releng@fedoraproject.org> - 3.0.0-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_26_Mass_Rebuild
-
-* Thu Jan 19 2017 Daniel P. Berrange <berrange@redhat.com> - 3.0.0-1
-- Rebase to version 3.0.0
