@@ -82,6 +82,7 @@
 %define with_sanlock       0%{!?_without_sanlock:0}
 %define with_numad         0%{!?_without_numad:0}
 %define with_firewalld     0%{!?_without_firewalld:0}
+%define with_firewalld_zone 0%{!?_without_firewalld_zone:0}
 %define with_libssh2       0%{!?_without_libssh2:0}
 %define with_wireshark     0%{!?_without_wireshark:0}
 %define with_libssh        0%{!?_without_libssh:0}
@@ -110,7 +111,7 @@
 %endif
 
 # Ceph dropping support for 32-bit hosts
-%if 0%{fedora} >= 30
+%if 0%{?fedora} >= 30
     %ifarch %{arm} %{ix86}
         %define with_storage_rbd 0
     %endif
@@ -136,6 +137,11 @@
 
 %define with_firewalld 1
 
+%if 0%{?fedora} >= 30 || 0%{?rhel} > 7
+    %define with_firewalld_zone 0%{!?_without_firewalld_zone:1}
+%endif
+
+
 # fuse is used to provide virtualized /proc for LXC
 %if %{with_lxc}
     %define with_fuse      0%{!?_without_fuse:1}
@@ -160,11 +166,7 @@
 # Enable wireshark plugins for all distros shipping libvirt 1.2.2 or newer
 %if 0%{?fedora}
     %define with_wireshark 0%{!?_without_wireshark:1}
-%endif
-%if 0%{?fedora} || 0%{?rhel} > 7
-    %define wireshark_plugindir %(pkg-config --variable plugindir wireshark)
-%else
-    %define wireshark_plugindir %{_libdir}/wireshark/plugins
+    %define wireshark_plugindir %(pkg-config --variable plugindir wireshark)/epan
 %endif
 
 # Enable libssh transport for new enough distros
@@ -213,8 +215,8 @@
 
 Summary: Library providing a simple virtualization API
 Name: libvirt
-Version: 5.0.0
-Release: 3%{?dist}%{?extra_release}
+Version: 5.1.0
+Release: 1%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -383,7 +385,7 @@ BuildRequires: numad
 %endif
 
 %if %{with_wireshark}
-BuildRequires: wireshark-devel >= 2.1.0
+BuildRequires: wireshark-devel >= 2.4.0
 %endif
 
 %if %{with_libssh}
@@ -393,6 +395,10 @@ BuildRequires: libssh-devel >= 0.7.0
 %if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires: rpcgen
 BuildRequires: libtirpc-devel
+%endif
+
+%if %{with_firewalld_zone}
+BuildRequires: firewalld-filesystem
 %endif
 
 Provides: bundled(gnulib)
@@ -925,7 +931,7 @@ Bash completion script stub.
 %if %{with_wireshark}
 %package wireshark
 Summary: Wireshark dissector plugin for libvirt RPC transactions
-Requires: wireshark >= 1.12.6-4
+Requires: wireshark >= 2.4.0
 Requires: %{name}-libs = %{version}-%{release}
 
 %description wireshark
@@ -1093,6 +1099,12 @@ exit 1
     %define arg_firewalld --without-firewalld
 %endif
 
+%if %{with_firewalld_zone}
+    %define arg_firewalld_zone --with-firewalld-zone
+%else
+    %define arg_firewalld_zone --without-firewalld-zone
+%endif
+
 %if %{with_wireshark}
     %define arg_wireshark --with-wireshark-dissector
 %else
@@ -1191,6 +1203,7 @@ rm -f po/stamp-po
            --with-dtrace \
            --with-driver-modules \
            %{?arg_firewalld} \
+           %{?arg_firewalld_zone} \
            %{?arg_wireshark} \
            --without-pm-utils \
            --with-nss-plugin \
@@ -1357,6 +1370,16 @@ if [ -f %{_localstatedir}/lib/rpm-state/libvirt/restart ]; then
     /bin/systemctl try-restart libvirtd.service >/dev/null 2>&1 || :
 fi
 rm -rf %{_localstatedir}/lib/rpm-state/libvirt || :
+
+%post daemon-driver-network
+%if %{with_firewalld}
+    %firewalld_reload
+%endif
+
+%postun daemon-driver-network
+%if %{with_firewalld}
+    %firewalld_reload
+%endif
 
 %post daemon-config-network
 if test $1 -eq 1 && test ! -f %{_sysconfdir}/libvirt/qemu/networks/default.xml ; then
@@ -1595,6 +1618,10 @@ exit 0
 %dir %attr(0755, root, root) %{_localstatedir}/lib/libvirt/dnsmasq/
 %attr(0755, root, root) %{_libexecdir}/libvirt_leaseshelper
 %{_libdir}/%{name}/connection-driver/libvirt_driver_network.so
+
+%if %{with_firewalld_zone}
+%{_prefix}/lib/firewalld/zones/libvirt.xml
+%endif
 
 %files daemon-driver-nodedev
 %{_libdir}/%{name}/connection-driver/libvirt_driver_nodedev.so
@@ -1867,6 +1894,9 @@ exit 0
 
 
 %changelog
+* Mon Mar  4 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.1.0-1
+- Update to 5.1.0 release
+
 * Sun Feb 17 2019 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 5.0.0-3
 - Rebuild for readline 8.0
 
