@@ -216,7 +216,7 @@
 Summary: Library providing a simple virtualization API
 Name: libvirt
 Version: 5.1.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -1470,17 +1470,12 @@ exit 0
 %endif
 
 %preun client
-
 %systemd_preun libvirt-guests.service
 
 %post client
-
-/sbin/ldconfig
 %systemd_post libvirt-guests.service
 
 %postun client
-
-/sbin/ldconfig
 %systemd_postun libvirt-guests.service
 
 %triggerun client -- libvirt < 0.9.4
@@ -1894,6 +1889,9 @@ exit 0
 
 
 %changelog
+* Wed Mar 06 2019 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 5.1.0-2
+- Remove obsolete scriptlets
+
 * Mon Mar  4 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.1.0-1
 - Update to 5.1.0 release
 
