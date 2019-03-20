@@ -15,7 +15,7 @@
 # Default to skipping autoreconf.  Distros can change just this one line
 # (or provide a command-line override) if they backport any patches that
 # touch configure.ac or Makefile.am.
-%{!?enable_autotools:%global enable_autotools 0}
+%{!?enable_autotools:%global enable_autotools 1}
 
 # The hypervisor drivers that run in libvirtd
 %define with_qemu          0%{!?_without_qemu:1}
@@ -216,7 +216,7 @@
 Summary: Library providing a simple virtualization API
 Name: libvirt
 Version: 5.1.0
-Release: 2%{?dist}
+Release: 3%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -224,6 +224,12 @@ URL: https://libvirt.org/
     %define mainturl stable_updates/
 %endif
 Source: https://libvirt.org/sources/%{?mainturl}libvirt-%{version}.tar.xz
+Patch1: 0001-storage-split-off-code-for-calling-rbd_list.patch
+Patch2: 0002-storage-add-support-for-new-rbd_list2-method.patch
+Patch3: 0003-network-improve-error-report-when-firewall-chain-cre.patch
+Patch4: 0004-network-split-setup-of-ipv4-and-ipv6-top-level-chain.patch
+Patch5: 0005-network-avoid-trying-to-create-global-firewall-rules.patch
+
 
 Requires: libvirt-daemon = %{version}-%{release}
 Requires: libvirt-daemon-config-network = %{version}-%{release}
@@ -326,6 +332,8 @@ BuildRequires: libiscsi-devel
 BuildRequires: parted-devel
 # For Multipath support
 BuildRequires: device-mapper-devel
+# For XFS reflink clone support
+BuildRequires: xfsprogs-devel
 %if %{with_storage_rbd}
 BuildRequires: librados2-devel
 BuildRequires: librbd1-devel
@@ -547,6 +555,9 @@ Requires: util-linux
 %if %{with_qemu}
 # From QEMU RPMs
 Requires: /usr/bin/qemu-img
+%endif
+%if !%{with_storage_rbd}
+Obsoletes: libvirt-daemon-driver-storage-rbd < %{version}-%{release}
 %endif
 
 %description daemon-driver-storage-core
@@ -1889,6 +1900,13 @@ exit 0
 
 
 %changelog
+* Wed Mar 20 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.1.0-3
+- Fix upgrades for rbd on i686 (rhbz #1688121)
+- Add missing xfsprogs-devel dep
+- Fix use of deprecated RBD features
+- Avoid using firewalld if unprivileged
+- Don't require ipv6 firewall support at startup (rhbz #1688968)
+
 * Wed Mar 06 2019 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 5.1.0-2
 - Remove obsolete scriptlets
 
