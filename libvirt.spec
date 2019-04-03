@@ -15,7 +15,7 @@
 # Default to skipping autoreconf.  Distros can change just this one line
 # (or provide a command-line override) if they backport any patches that
 # touch configure.ac or Makefile.am.
-%{!?enable_autotools:%global enable_autotools 1}
+%{!?enable_autotools:%global enable_autotools 0}
 
 # The hypervisor drivers that run in libvirtd
 %define with_qemu          0%{!?_without_qemu:1}
@@ -215,8 +215,8 @@
 
 Summary: Library providing a simple virtualization API
 Name: libvirt
-Version: 5.1.0
-Release: 3%{?dist}
+Version: 5.2.0
+Release: 1%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -224,12 +224,6 @@ URL: https://libvirt.org/
     %define mainturl stable_updates/
 %endif
 Source: https://libvirt.org/sources/%{?mainturl}libvirt-%{version}.tar.xz
-Patch1: 0001-storage-split-off-code-for-calling-rbd_list.patch
-Patch2: 0002-storage-add-support-for-new-rbd_list2-method.patch
-Patch3: 0003-network-improve-error-report-when-firewall-chain-cre.patch
-Patch4: 0004-network-split-setup-of-ipv4-and-ipv6-top-level-chain.patch
-Patch5: 0005-network-avoid-trying-to-create-global-firewall-rules.patch
-
 
 Requires: libvirt-daemon = %{version}-%{release}
 Requires: libvirt-daemon-config-network = %{version}-%{release}
@@ -1334,6 +1328,16 @@ then
   exit 1
 fi
 
+%post libs
+%if 0%{?rhel} == 7
+/sbin/ldconfig
+%endif
+
+%postun libs
+%if 0%{?rhel} == 7
+/sbin/ldconfig
+%endif
+
 %pre daemon
 # 'libvirt' group is just to allow password-less polkit access to
 # libvirtd. The uid number is irrelevant, so we use dynamic allocation
@@ -1453,16 +1457,6 @@ fi
 rm -rf %{_localstatedir}/lib/rpm-state/libvirt || :
 
 
-%triggerun -- libvirt < 0.9.4
-%{_bindir}/systemd-sysv-convert --save libvirtd >/dev/null 2>&1 ||:
-
-# If the package is allowed to autostart:
-/bin/systemctl --no-reload enable libvirtd.service >/dev/null 2>&1 ||:
-
-# Run these because the SysV package being removed won't do them
-/sbin/chkconfig --del libvirtd >/dev/null 2>&1 || :
-/bin/systemctl try-restart libvirtd.service >/dev/null 2>&1 || :
-
 %if %{with_qemu}
 %pre daemon-driver-qemu
 # We want soft static allocation of well-known ids, as disk images
@@ -1481,6 +1475,7 @@ exit 0
 %endif
 
 %preun client
+
 %systemd_preun libvirt-guests.service
 
 %post client
@@ -1488,15 +1483,6 @@ exit 0
 
 %postun client
 %systemd_postun libvirt-guests.service
-
-%triggerun client -- libvirt < 0.9.4
-%{_bindir}/systemd-sysv-convert --save libvirt-guests >/dev/null 2>&1 ||:
-
-# If the package is allowed to autostart:
-/bin/systemctl --no-reload enable libvirt-guests.service >/dev/null 2>&1 ||:
-
-# Run this because the SysV package being removed won't do them
-/sbin/chkconfig --del libvirt-guests >/dev/null 2>&1 || :
 
 %if %{with_sanlock}
 %post lock-sanlock
@@ -1828,6 +1814,7 @@ exit 0
 %{_datadir}/libvirt/schemas/secret.rng
 %{_datadir}/libvirt/schemas/storagecommon.rng
 %{_datadir}/libvirt/schemas/storagepool.rng
+%{_datadir}/libvirt/schemas/storagepoolcaps.rng
 %{_datadir}/libvirt/schemas/storagevol.rng
 
 %{_datadir}/libvirt/cpu_map/*.xml
@@ -1900,6 +1887,9 @@ exit 0
 
 
 %changelog
+* Wed Apr  3 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.2.0-1
+- Update to 5.2.0 release
+
 * Wed Mar 20 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.1.0-3
 - Fix upgrades for rbd on i686 (rhbz #1688121)
 - Add missing xfsprogs-devel dep
