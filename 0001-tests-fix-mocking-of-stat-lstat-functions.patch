@@ -79,20 +79,6 @@ Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
  10 files changed, 413 insertions(+), 527 deletions(-)
  create mode 100644 tests/virmockstathelpers.c
 
-diff --git a/build-aux/mock-noinline.pl b/build-aux/mock-noinline.pl
-index c6b40001c5..958e133885 100644
---- a/build-aux/mock-noinline.pl
-+++ b/build-aux/mock-noinline.pl
-@@ -6,6 +6,9 @@ my %mocked;
- # Functions in public header don't get the noinline annotation
- # so whitelist them here
- $noninlined{"virEventAddTimeout"} = 1;
-+# This one confuses the script as its defined in the mock file
-+# but is actually just a local helper
-+$noninlined{"virMockStatRedirect"} = 1;
- 
- foreach my $arg (@ARGV) {
-     if ($arg =~ /\.h$/) {
 diff --git a/cfg.mk b/cfg.mk
 index 8594f64482..5ffae32f2a 100644
 --- a/cfg.mk
