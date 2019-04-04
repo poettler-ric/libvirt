@@ -64,6 +64,7 @@
 %define with_numactl          0%{!?_without_numactl:1}
 
 # F25+ has zfs-fuse
+%define _without_storage_zfs 1
 %if 0%{?fedora}
     %define with_storage_zfs      0%{!?_without_storage_zfs:1}
 %else
