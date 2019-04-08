@@ -216,7 +216,7 @@
 Summary: Library providing a simple virtualization API
 Name: libvirt
 Version: 5.2.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -1888,6 +1888,9 @@ exit 0
 
 
 %changelog
+* Mon Apr 08 2019 Cole Robinson <crobinso@redhat.com> - 5.2.0-2
+- Rebuild for xen 4.12 soname bump
+
 * Wed Apr  3 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.2.0-1
 - Update to 5.2.0 release
 
