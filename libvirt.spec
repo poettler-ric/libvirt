@@ -137,7 +137,7 @@
 
 %define with_firewalld 1
 
-%if 0%{?fedora} >= 30 || 0%{?rhel} > 7
+%if 0%{?fedora} >= 31 || 0%{?rhel} > 7
     %define with_firewalld_zone 0%{!?_without_firewalld_zone:1}
 %endif
 
@@ -215,8 +215,8 @@
 
 Summary: Library providing a simple virtualization API
 Name: libvirt
-Version: 5.2.0
-Release: 2%{?dist}
+Version: 5.3.0
+Release: 1%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -224,7 +224,6 @@ URL: https://libvirt.org/
     %define mainturl stable_updates/
 %endif
 Source: https://libvirt.org/sources/%{?mainturl}libvirt-%{version}.tar.xz
-Patch1: 0001-tests-fix-mocking-of-stat-lstat-functions.patch
 
 Requires: libvirt-daemon = %{version}-%{release}
 Requires: libvirt-daemon-config-network = %{version}-%{release}
@@ -1388,12 +1387,12 @@ fi
 rm -rf %{_localstatedir}/lib/rpm-state/libvirt || :
 
 %post daemon-driver-network
-%if %{with_firewalld}
+%if %{with_firewalld_zone}
     %firewalld_reload
 %endif
 
 %postun daemon-driver-network
-%if %{with_firewalld}
+%if %{with_firewalld_zone}
     %firewalld_reload
 %endif
 
@@ -1888,6 +1887,9 @@ exit 0
 
 
 %changelog
+* Tue May  7 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.3.0-1
+- Update to 5.3.0 release
+
 * Mon Apr 08 2019 Cole Robinson <crobinso@redhat.com> - 5.2.0-2
 - Rebuild for xen 4.12 soname bump
 
