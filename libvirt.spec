@@ -216,7 +216,7 @@
 Summary: Library providing a simple virtualization API
 Name: libvirt
 Version: 5.3.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -224,6 +224,8 @@ URL: https://libvirt.org/
     %define mainturl stable_updates/
 %endif
 Source: https://libvirt.org/sources/%{?mainturl}libvirt-%{version}.tar.xz
+Patch1: 0001-cputest-Add-data-for-Intel-R-Xeon-R-CPU-E3-1225-v5.patch
+Patch2: 0002-cpu_map-Define-md-clear-CPUID-bit.patch
 
 Requires: libvirt-daemon = %{version}-%{release}
 Requires: libvirt-daemon-config-network = %{version}-%{release}
@@ -1887,6 +1889,11 @@ exit 0
 
 
 %changelog
+* Tue May 14 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.3.0-2
+- Define md-clear CPUID bit
+- Resolves: rhbz #1709977 (CVE-2018-12126), rhbz #1709979 (CVE-2018-12127),
+  rhbz #1709997 (CVE-2018-12130), rhbz #1709984 (CVE-2019-11091)
+
 * Tue May  7 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.3.0-1
 - Update to 5.3.0 release
 
