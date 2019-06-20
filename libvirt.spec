@@ -216,7 +216,7 @@
 Summary: Library providing a simple virtualization API
 Name: libvirt
 Version: 5.4.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -224,6 +224,20 @@ URL: https://libvirt.org/
     %define mainturl stable_updates/
 %endif
 Source: https://libvirt.org/sources/%{?mainturl}libvirt-%{version}.tar.xz
+
+# CVE-2019-10161: arbitrary file read/exec via virDomainSaveImageGetXMLDesc
+# API (bz #1722463, bz #1720115)
+Patch0001: 0001-api-disallow-virDomainSaveImageGetXMLDesc-on-read-on.patch
+# CVE-2019-10166: virDomainManagedSaveDefineXML API exposed to readonly
+# clients (bz #1722462, bz #1720114)
+Patch0002: 0002-api-disallow-virDomainManagedSaveDefineXML-on-read-o.patch
+# CVE-2019-10167: arbitrary command execution via
+# virConnectGetDomainCapabilities API (bz #1722464, bz #1720117)
+Patch0003: 0003-api-disallow-virConnectGetDomainCapabilities-on-read.patch
+# CVE-2019-10168: arbitrary command execution via
+# virConnectBaselineHypervisorCPU and virConnectCompareHypervisorCPU APIs (bz
+# #1722466, bz #1720118)
+Patch0004: 0004-api-disallow-virConnect-HypervisorCPU-on-read-only-c.patch
 
 Requires: libvirt-daemon = %{version}-%{release}
 Requires: libvirt-daemon-config-network = %{version}-%{release}
@@ -1870,6 +1884,17 @@ exit 0
 
 
 %changelog
+* Thu Jun 20 2019 Cole Robinson <crobinso@redhat.com> - 5.4.0-2
+- CVE-2019-10161: arbitrary file read/exec via virDomainSaveImageGetXMLDesc
+  API (bz #1722463, bz #1720115)
+- CVE-2019-10166: virDomainManagedSaveDefineXML API exposed to readonly
+  clients (bz #1722462, bz #1720114)
+- CVE-2019-10167: arbitrary command execution via
+  virConnectGetDomainCapabilities API (bz #1722464, bz #1720117)
+- CVE-2019-10168: arbitrary command execution via
+  virConnectBaselineHypervisorCPU and virConnectCompareHypervisorCPU APIs (bz
+  #1722466, bz #1720118)
+
 * Wed Jun 12 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.4.0-1
 - Update to 5.4.0 release
 
