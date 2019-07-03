@@ -4,7 +4,7 @@
 # that's still supported by the vendor. It may work on other distros
 # or versions, but no effort will be made to ensure that going forward.
 %define min_rhel 7
-%define min_fedora 28
+%define min_fedora 29
 
 %if (0%{?fedora} && 0%{?fedora} >= %{min_fedora}) || (0%{?rhel} && 0%{?rhel} >= %{min_rhel})
     %define supported_platform 1
@@ -215,8 +215,8 @@
 
 Summary: Library providing a simple virtualization API
 Name: libvirt
-Version: 5.4.0
-Release: 2%{?dist}
+Version: 5.5.0
+Release: 1%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -224,20 +224,6 @@ URL: https://libvirt.org/
     %define mainturl stable_updates/
 %endif
 Source: https://libvirt.org/sources/%{?mainturl}libvirt-%{version}.tar.xz
-
-# CVE-2019-10161: arbitrary file read/exec via virDomainSaveImageGetXMLDesc
-# API (bz #1722463, bz #1720115)
-Patch0001: 0001-api-disallow-virDomainSaveImageGetXMLDesc-on-read-on.patch
-# CVE-2019-10166: virDomainManagedSaveDefineXML API exposed to readonly
-# clients (bz #1722462, bz #1720114)
-Patch0002: 0002-api-disallow-virDomainManagedSaveDefineXML-on-read-o.patch
-# CVE-2019-10167: arbitrary command execution via
-# virConnectGetDomainCapabilities API (bz #1722464, bz #1720117)
-Patch0003: 0003-api-disallow-virConnectGetDomainCapabilities-on-read.patch
-# CVE-2019-10168: arbitrary command execution via
-# virConnectBaselineHypervisorCPU and virConnectCompareHypervisorCPU APIs (bz
-# #1722466, bz #1720118)
-Patch0004: 0004-api-disallow-virConnect-HypervisorCPU-on-read-only-c.patch
 
 Requires: libvirt-daemon = %{version}-%{release}
 Requires: libvirt-daemon-config-network = %{version}-%{release}
@@ -311,7 +297,6 @@ BuildRequires: sanlock-devel >= 2.4
 %endif
 BuildRequires: libpcap-devel
 BuildRequires: libnl3-devel
-BuildRequires: avahi-devel
 BuildRequires: libselinux-devel
 BuildRequires: dnsmasq >= 2.41
 BuildRequires: iptables
@@ -450,7 +435,6 @@ Requires: iproute
 Requires: iproute-tc
 %endif
 
-Requires: avahi-libs
 Requires: polkit >= 0.112
 %ifarch %{ix86} x86_64 ia64
 # For virConnectGetSysinfo
@@ -1177,7 +1161,6 @@ rm -f po/stamp-po
            %{?arg_vbox} \
            %{?arg_libxl} \
            --with-sasl \
-           --with-avahi \
            --with-polkit \
            --with-libvirtd \
            %{?arg_phyp} \
@@ -1582,8 +1565,6 @@ exit 0
 %{_mandir}/man8/virtlockd.8*
 %{_mandir}/man7/virkey*.7*
 
-%doc examples/polkit/*.rules
-
 %files daemon-config-network
 %dir %{_datadir}/libvirt/networks/
 %{_datadir}/libvirt/networks/default.xml
@@ -1804,6 +1785,7 @@ exit 0
 %{_datadir}/libvirt/schemas/interface.rng
 %{_datadir}/libvirt/schemas/network.rng
 %{_datadir}/libvirt/schemas/networkcommon.rng
+%{_datadir}/libvirt/schemas/networkport.rng
 %{_datadir}/libvirt/schemas/nodedev.rng
 %{_datadir}/libvirt/schemas/nwfilter.rng
 %{_datadir}/libvirt/schemas/nwfilter_params.rng
@@ -1879,11 +1861,12 @@ exit 0
 %{_datadir}/libvirt/api/libvirt-admin-api.xml
 %{_datadir}/libvirt/api/libvirt-qemu-api.xml
 %{_datadir}/libvirt/api/libvirt-lxc-api.xml
-# Needed building python bindings
-%doc docs/libvirt-api.xml
 
 
 %changelog
+* Wed Jul 03 2019 Cole Robinson <crobinso@redhat.com> - 5.5.0-1
+- Rebased to version 5.5.0
+
 * Thu Jun 20 2019 Cole Robinson <crobinso@redhat.com> - 5.4.0-2
 - CVE-2019-10161: arbitrary file read/exec via virDomainSaveImageGetXMLDesc
   API (bz #1722463, bz #1720115)
