@@ -4,7 +4,7 @@
 # that's still supported by the vendor. It may work on other distros
 # or versions, but no effort will be made to ensure that going forward.
 %define min_rhel 7
-%define min_fedora 28
+%define min_fedora 29
 
 %if (0%{?fedora} && 0%{?fedora} >= %{min_fedora}) || (0%{?rhel} && 0%{?rhel} >= %{min_rhel})
     %define supported_platform 1
@@ -216,8 +216,8 @@
 
 Summary: Library providing a simple virtualization API
 Name: libvirt
-Version: 5.3.0
-Release: 3%{?dist}
+Version: 5.5.0
+Release: 1%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -225,12 +225,6 @@ URL: https://libvirt.org/
     %define mainturl stable_updates/
 %endif
 Source: https://libvirt.org/sources/%{?mainturl}libvirt-%{version}.tar.xz
-Patch1: 0001-cputest-Add-data-for-Intel-R-Xeon-R-CPU-E3-1225-v5.patch
-Patch2: 0002-cpu_map-Define-md-clear-CPUID-bit.patch
-# Fix systemd socket permissions (CVE-2019-10132)
-Patch3: 0003-admin-reject-clients-unless-their-UID-matches-the-cu.patch
-Patch4: 0004-locking-restrict-sockets-to-mode-0600.patch
-Patch5: 0005-logging-restrict-sockets-to-mode-0600.patch
 
 Requires: libvirt-daemon = %{version}-%{release}
 Requires: libvirt-daemon-config-network = %{version}-%{release}
@@ -304,7 +298,6 @@ BuildRequires: sanlock-devel >= 2.4
 %endif
 BuildRequires: libpcap-devel
 BuildRequires: libnl3-devel
-BuildRequires: avahi-devel
 BuildRequires: libselinux-devel
 BuildRequires: dnsmasq >= 2.41
 BuildRequires: iptables
@@ -443,7 +436,6 @@ Requires: iproute
 Requires: iproute-tc
 %endif
 
-Requires: avahi-libs
 Requires: polkit >= 0.112
 %ifarch %{ix86} x86_64 ia64
 # For virConnectGetSysinfo
@@ -727,9 +719,6 @@ parted and more.
 Summary: QEMU driver plugin for the libvirtd daemon
 Requires: libvirt-daemon = %{version}-%{release}
 Requires: libvirt-libs = %{version}-%{release}
-# There really is a hard cross-driver dependency here
-Requires: libvirt-daemon-driver-network = %{version}-%{release}
-Requires: libvirt-daemon-driver-storage-core = %{version}-%{release}
 Requires: /usr/bin/qemu-img
 # For image compression
 Requires: gzip
@@ -1173,7 +1162,6 @@ rm -f po/stamp-po
            %{?arg_vbox} \
            %{?arg_libxl} \
            --with-sasl \
-           --with-avahi \
            --with-polkit \
            --with-libvirtd \
            %{?arg_phyp} \
@@ -1239,8 +1227,6 @@ export SOURCE_DATE_EPOCH=$(stat --printf='%Y' %{_specdir}/%{name}.spec)
 
 %make_install %{?_smp_mflags} SYSTEMD_UNIT_DIR=%{_unitdir} V=1
 
-make %{?_smp_mflags} -C examples distclean V=1
-
 rm -f $RPM_BUILD_ROOT%{_libdir}/*.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/*.a
 rm -f $RPM_BUILD_ROOT%{_libdir}/libvirt/lock-driver/*.la
@@ -1262,8 +1248,8 @@ install -d -m 0755 $RPM_BUILD_ROOT%{_datadir}/lib/libvirt/dnsmasq/
 install -d -m 0755 $RPM_BUILD_ROOT%{_datadir}/libvirt/networks/
 cp $RPM_BUILD_ROOT%{_sysconfdir}/libvirt/qemu/networks/default.xml \
    $RPM_BUILD_ROOT%{_datadir}/libvirt/networks/default.xml
-rm -f $RPM_BUILD_ROOT%{_sysconfdir}/libvirt/qemu/networks/default.xml
-rm -f $RPM_BUILD_ROOT%{_sysconfdir}/libvirt/qemu/networks/autostart/default.xml
+# libvirt saves this file with mode 0600
+chmod 0600 $RPM_BUILD_ROOT%{_sysconfdir}/libvirt/qemu/networks/default.xml
 
 # nwfilter files are installed in /usr/share/libvirt and copied to /etc in %post
 # to avoid verification errors on changed files in /etc
@@ -1307,7 +1293,7 @@ rm -f $RPM_BUILD_ROOT%{_datadir}/augeas/lenses/tests/test_libvirtd_libxl.aug
 %endif
 
 # Copied into libvirt-docs subpackage eventually
-mv $RPM_BUILD_ROOT%{_datadir}/doc/libvirt-%{version} libvirt-docs
+mv $RPM_BUILD_ROOT%{_datadir}/doc/libvirt libvirt-docs
 
 %ifarch %{power64} s390x x86_64 ia64 alpha sparc64
 mv $RPM_BUILD_ROOT%{_datadir}/systemtap/tapset/libvirt_probes.stp \
@@ -1439,6 +1425,8 @@ if test $1 -eq 1 && test ! -f %{_sysconfdir}/libvirt/qemu/networks/default.xml ;
          < %{_datadir}/libvirt/networks/default.xml \
          > %{_sysconfdir}/libvirt/qemu/networks/default.xml
     ln -s ../default.xml %{_sysconfdir}/libvirt/qemu/networks/autostart/default.xml
+    # libvirt saves this file with mode 0600
+    chmod 0600 %{_sysconfdir}/libvirt/qemu/networks/default.xml
 
     # Make sure libvirt picks up the new network defininiton
     mkdir -p %{_localstatedir}/lib/rpm-state/libvirt || :
@@ -1453,6 +1441,8 @@ rm -rf %{_localstatedir}/lib/rpm-state/libvirt || :
 
 %post daemon-config-nwfilter
 cp %{_datadir}/libvirt/nwfilter/*.xml %{_sysconfdir}/libvirt/nwfilter/
+# libvirt saves these files with mode 600
+chmod 600 %{_sysconfdir}/libvirt/nwfilter/*.xml
 # Make sure libvirt picks up the new nwfilter defininitons
 mkdir -p %{_localstatedir}/lib/rpm-state/libvirt || :
 touch %{_localstatedir}/lib/rpm-state/libvirt/restart || :
@@ -1491,14 +1481,6 @@ exit 0
 %postun client
 %systemd_postun libvirt-guests.service
 
-%if %{with_sanlock}
-%post lock-sanlock
-if getent group sanlock > /dev/null ; then
-    chmod 0770 %{_localstatedir}/lib/libvirt/sanlock
-    chown root:sanlock %{_localstatedir}/lib/libvirt/sanlock
-fi
-%endif
-
 %if %{with_lxc}
 %pre login-shell
 getent group virtlogin >/dev/null || groupadd -r virtlogin
@@ -1517,16 +1499,6 @@ exit 0
 %doc %{_datadir}/gtk-doc/html/libvirt/*.html
 %doc %{_datadir}/gtk-doc/html/libvirt/*.png
 %doc %{_datadir}/gtk-doc/html/libvirt/*.css
-%doc examples/hellolibvirt
-%doc examples/object-events
-%doc examples/dominfo
-%doc examples/domsuspend
-%doc examples/dommigrate
-%doc examples/openauth
-%doc examples/xml
-%doc examples/rename
-%doc examples/systemtap
-%doc examples/admin
 
 
 %files daemon
@@ -1594,11 +1566,11 @@ exit 0
 %{_mandir}/man8/virtlockd.8*
 %{_mandir}/man7/virkey*.7*
 
-%doc examples/polkit/*.rules
-
 %files daemon-config-network
 %dir %{_datadir}/libvirt/networks/
 %{_datadir}/libvirt/networks/default.xml
+%ghost %{_sysconfdir}/libvirt/qemu/networks/default.xml
+%ghost %{_sysconfdir}/libvirt/qemu/networks/autostart/default.xml
 
 %files daemon-config-nwfilter
 %dir %{_datadir}/libvirt/nwfilter/
@@ -1689,7 +1661,7 @@ exit 0
 %config(noreplace) %{_sysconfdir}/libvirt/qemu.conf
 %config(noreplace) %{_sysconfdir}/libvirt/qemu-lockd.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/libvirtd.qemu
-%ghost %dir %attr(0700, root, root) %{_localstatedir}/run/libvirt/qemu/
+%ghost %dir %{_localstatedir}/run/libvirt/qemu/
 %dir %attr(0751, %{qemu_user}, %{qemu_group}) %{_localstatedir}/lib/libvirt/qemu/
 %dir %attr(0750, %{qemu_user}, %{qemu_group}) %{_localstatedir}/cache/libvirt/qemu/
 %{_datadir}/augeas/lenses/libvirtd_qemu.aug
@@ -1761,7 +1733,7 @@ exit 0
 %attr(0755, root, root) %{_libdir}/libvirt/lock-driver/sanlock.so
 %{_datadir}/augeas/lenses/libvirt_sanlock.aug
 %{_datadir}/augeas/lenses/tests/test_libvirt_sanlock.aug
-%dir %attr(0700, root, root) %{_localstatedir}/lib/libvirt/sanlock
+%dir %attr(0770, root, sanlock) %{_localstatedir}/lib/libvirt/sanlock
 %{_sbindir}/virt-sanlock-cleanup
 %{_mandir}/man8/virt-sanlock-cleanup.8*
 %attr(0755, root, root) %{_libexecdir}/libvirt_sanlock_helper
@@ -1814,6 +1786,7 @@ exit 0
 %{_datadir}/libvirt/schemas/interface.rng
 %{_datadir}/libvirt/schemas/network.rng
 %{_datadir}/libvirt/schemas/networkcommon.rng
+%{_datadir}/libvirt/schemas/networkport.rng
 %{_datadir}/libvirt/schemas/nodedev.rng
 %{_datadir}/libvirt/schemas/nwfilter.rng
 %{_datadir}/libvirt/schemas/nwfilter_params.rng
@@ -1889,11 +1862,26 @@ exit 0
 %{_datadir}/libvirt/api/libvirt-admin-api.xml
 %{_datadir}/libvirt/api/libvirt-qemu-api.xml
 %{_datadir}/libvirt/api/libvirt-lxc-api.xml
-# Needed building python bindings
-%doc docs/libvirt-api.xml
 
 
 %changelog
+* Wed Jul 03 2019 Cole Robinson <crobinso@redhat.com> - 5.5.0-1
+- Rebased to version 5.5.0
+
+* Thu Jun 20 2019 Cole Robinson <crobinso@redhat.com> - 5.4.0-2
+- CVE-2019-10161: arbitrary file read/exec via virDomainSaveImageGetXMLDesc
+  API (bz #1722463, bz #1720115)
+- CVE-2019-10166: virDomainManagedSaveDefineXML API exposed to readonly
+  clients (bz #1722462, bz #1720114)
+- CVE-2019-10167: arbitrary command execution via
+  virConnectGetDomainCapabilities API (bz #1722464, bz #1720117)
+- CVE-2019-10168: arbitrary command execution via
+  virConnectBaselineHypervisorCPU and virConnectCompareHypervisorCPU APIs (bz
+  #1722466, bz #1720118)
+
+* Wed Jun 12 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.4.0-1
+- Update to 5.4.0 release
+
 * Tue May 21 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.3.0-3
 - Fix systemd socket permissions
 - Resolves: rhbz #1712498 (CVE-2019-10132)
