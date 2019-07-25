@@ -216,7 +216,7 @@
 Summary: Library providing a simple virtualization API
 Name: libvirt
 Version: 5.5.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -1864,6 +1864,9 @@ exit 0
 
 
 %changelog
+* Thu Jul 25 2019 Fedora Release Engineering <releng@fedoraproject.org> - 5.5.0-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_31_Mass_Rebuild
+
 * Wed Jul 03 2019 Cole Robinson <crobinso@redhat.com> - 5.5.0-1
 - Rebased to version 5.5.0
 
