@@ -215,7 +215,7 @@
 
 Summary: Library providing a simple virtualization API
 Name: libvirt
-Version: 5.6.0
+Version: 5.7.0
 Release: 1%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
@@ -424,6 +424,9 @@ Summary: Server side daemon and supporting files for libvirt library
 
 # The client side, i.e. shared libs are in a subpackage
 Requires: %{name}-libs = %{version}-%{release}
+
+# (client invokes 'nc' against the UNIX socket on the server)
+Requires: /usr/bin/nc
 
 # for modprobe of pci devices
 Requires: module-init-tools
@@ -899,8 +902,6 @@ capabilities of recent versions of Linux (and other OSes).
 %package libs
 Summary: Client side libraries
 # So remote clients can access libvirt over SSH tunnel
-# (client invokes 'nc' against the UNIX socket on the server)
-Requires: nc
 Requires: cyrus-sasl
 # Needed by default sasl.conf - no onerous extra deps, since
 # 100's of other things on a system already pull in krb5-libs
@@ -1155,7 +1156,8 @@ export SOURCE_DATE_EPOCH=$(stat --printf='%Y' %{_specdir}/%{name}.spec)
 %endif
 
 rm -f po/stamp-po
-%configure %{?arg_qemu} \
+%configure --with-runstatedir=%{_rundir} \
+           %{?arg_qemu} \
            %{?arg_openvz} \
            %{?arg_lxc} \
            %{?arg_vbox} \
@@ -1170,6 +1172,7 @@ rm -f po/stamp-po
            --without-xenapi \
            --without-vz \
            --without-bhyve \
+           --with-remote-default-mode=legacy \
            --with-interface \
            --with-network \
            --with-storage-fs \
@@ -1378,19 +1381,37 @@ fi
 
 %posttrans daemon
 if [ -f %{_localstatedir}/lib/rpm-state/libvirt/restart ]; then
-    # Old libvirtd owns the sockets and will delete them on
-    # shutdown. Can't use a try-restart as libvirtd will simply
-    # own the sockets again when it comes back up. Thus we must
-    # do this particular ordering
-    /bin/systemctl is-active libvirtd.service 1>/dev/null 2>&1
-    if test $? = 0 ; then
-        /bin/systemctl stop libvirtd.service >/dev/null 2>&1 || :
+    # See if user has previously modified their install to
+    # tell libvirtd to use --listen
+    grep -E '^LIBVIRTD_ARGS=.*--listen' /etc/sysconfig/libvirtd 1>/dev/null 2>&1
+    if test $? = 0
+    then
+        # Then lets keep honouring --listen and *not* use
+        # systemd socket activation, because switching things
+        # might confuse mgmt tool like puppet/ansible that
+        # expect the old style libvirtd
+        /bin/systemctl mask libvirtd.socket >/dev/null 2>&1 || :
+        /bin/systemctl mask libvirtd-ro.socket >/dev/null 2>&1 || :
+        /bin/systemctl mask libvirtd-admin.socket >/dev/null 2>&1 || :
+        /bin/systemctl mask libvirtd-tls.socket >/dev/null 2>&1 || :
+        /bin/systemctl mask libvirtd-tcp.socket >/dev/null 2>&1 || :
+    else
+        # Old libvirtd owns the sockets and will delete them on
+        # shutdown. Can't use a try-restart as libvirtd will simply
+        # own the sockets again when it comes back up. Thus we must
+        # do this particular ordering, so that we get libvirtd
+        # running with socket activation in use
+        /bin/systemctl is-active libvirtd.service 1>/dev/null 2>&1
+        if test $? = 0
+        then
+            /bin/systemctl stop libvirtd.service >/dev/null 2>&1 || :
 
-        /bin/systemctl try-restart libvirtd.socket >/dev/null 2>&1 || :
-        /bin/systemctl try-restart libvirtd-ro.socket >/dev/null 2>&1 || :
-        /bin/systemctl try-restart libvirtd-admin.socket >/dev/null 2>&1 || :
+            /bin/systemctl try-restart libvirtd.socket >/dev/null 2>&1 || :
+            /bin/systemctl try-restart libvirtd-ro.socket >/dev/null 2>&1 || :
+            /bin/systemctl try-restart libvirtd-admin.socket >/dev/null 2>&1 || :
 
-        /bin/systemctl start libvirtd.service >/dev/null 2>&1 || :
+            /bin/systemctl start libvirtd.service >/dev/null 2>&1 || :
+        fi
     fi
 fi
 rm -rf %{_localstatedir}/lib/rpm-state/libvirt || :
@@ -1527,6 +1548,12 @@ exit 0
 %{_unitdir}/libvirtd-admin.socket
 %{_unitdir}/libvirtd-tcp.socket
 %{_unitdir}/libvirtd-tls.socket
+%{_unitdir}/virtproxyd.service
+%{_unitdir}/virtproxyd.socket
+%{_unitdir}/virtproxyd-ro.socket
+%{_unitdir}/virtproxyd-admin.socket
+%{_unitdir}/virtproxyd-tcp.socket
+%{_unitdir}/virtproxyd-tls.socket
 %{_unitdir}/virt-guest-shutdown.target
 %{_unitdir}/virtlogd.service
 %{_unitdir}/virtlogd.socket
@@ -1538,6 +1565,7 @@ exit 0
 %config(noreplace) %{_sysconfdir}/sysconfig/virtlogd
 %config(noreplace) %{_sysconfdir}/sysconfig/virtlockd
 %config(noreplace) %{_sysconfdir}/libvirt/libvirtd.conf
+%config(noreplace) %{_sysconfdir}/libvirt/virtproxyd.conf
 %config(noreplace) %{_sysconfdir}/libvirt/virtlogd.conf
 %config(noreplace) %{_sysconfdir}/libvirt/virtlockd.conf
 %config(noreplace) %{_sysconfdir}/sasl2/libvirt.conf
@@ -1546,7 +1574,7 @@ exit 0
 %config(noreplace) %{_sysconfdir}/logrotate.d/libvirtd
 %dir %{_datadir}/libvirt/
 
-%ghost %dir %{_localstatedir}/run/libvirt/
+%ghost %dir %{_rundir}/libvirt/
 
 %dir %attr(0711, root, root) %{_localstatedir}/lib/libvirt/images/
 %dir %attr(0711, root, root) %{_localstatedir}/lib/libvirt/filesystems/
@@ -1565,6 +1593,8 @@ exit 0
 %{_datadir}/augeas/lenses/tests/test_virtlogd.aug
 %{_datadir}/augeas/lenses/virtlockd.aug
 %{_datadir}/augeas/lenses/tests/test_virtlockd.aug
+%{_datadir}/augeas/lenses/virtproxyd.aug
+%{_datadir}/augeas/lenses/tests/test_virtproxyd.aug
 %{_datadir}/augeas/lenses/libvirt_lockd.aug
 %if %{with_qemu}
 %{_datadir}/augeas/lenses/tests/test_libvirt_lockd.aug
@@ -1579,6 +1609,7 @@ exit 0
 %attr(0755, root, root) %{_libexecdir}/libvirt_iohelper
 
 %attr(0755, root, root) %{_sbindir}/libvirtd
+%attr(0755, root, root) %{_sbindir}/virtproxyd
 %attr(0755, root, root) %{_sbindir}/virtlogd
 %attr(0755, root, root) %{_sbindir}/virtlockd
 
@@ -1599,13 +1630,29 @@ exit 0
 %ghost %{_sysconfdir}/libvirt/nwfilter/*.xml
 
 %files daemon-driver-interface
+%config(noreplace) %{_sysconfdir}/libvirt/virtinterfaced.conf
+%{_datadir}/augeas/lenses/virtinterfaced.aug
+%{_datadir}/augeas/lenses/tests/test_virtinterfaced.aug
+%{_unitdir}/virtinterfaced.service
+%{_unitdir}/virtinterfaced.socket
+%{_unitdir}/virtinterfaced-ro.socket
+%{_unitdir}/virtinterfaced-admin.socket
+%attr(0755, root, root) %{_sbindir}/virtinterfaced
 %{_libdir}/%{name}/connection-driver/libvirt_driver_interface.so
 
 %files daemon-driver-network
+%config(noreplace) %{_sysconfdir}/libvirt/virtnetworkd.conf
+%{_datadir}/augeas/lenses/virtnetworkd.aug
+%{_datadir}/augeas/lenses/tests/test_virtnetworkd.aug
+%{_unitdir}/virtnetworkd.service
+%{_unitdir}/virtnetworkd.socket
+%{_unitdir}/virtnetworkd-ro.socket
+%{_unitdir}/virtnetworkd-admin.socket
+%attr(0755, root, root) %{_sbindir}/virtnetworkd
 %dir %attr(0700, root, root) %{_sysconfdir}/libvirt/qemu/
 %dir %attr(0700, root, root) %{_sysconfdir}/libvirt/qemu/networks/
 %dir %attr(0700, root, root) %{_sysconfdir}/libvirt/qemu/networks/autostart
-%ghost %dir %{_localstatedir}/run/libvirt/network/
+%ghost %dir %{_rundir}/libvirt/network/
 %dir %attr(0700, root, root) %{_localstatedir}/lib/libvirt/network/
 %dir %attr(0755, root, root) %{_localstatedir}/lib/libvirt/dnsmasq/
 %attr(0755, root, root) %{_libexecdir}/libvirt_leaseshelper
@@ -1616,19 +1663,51 @@ exit 0
 %endif
 
 %files daemon-driver-nodedev
+%config(noreplace) %{_sysconfdir}/libvirt/virtnodedevd.conf
+%{_datadir}/augeas/lenses/virtnodedevd.aug
+%{_datadir}/augeas/lenses/tests/test_virtnodedevd.aug
+%{_unitdir}/virtnodedevd.service
+%{_unitdir}/virtnodedevd.socket
+%{_unitdir}/virtnodedevd-ro.socket
+%{_unitdir}/virtnodedevd-admin.socket
+%attr(0755, root, root) %{_sbindir}/virtnodedevd
 %{_libdir}/%{name}/connection-driver/libvirt_driver_nodedev.so
 
 %files daemon-driver-nwfilter
+%config(noreplace) %{_sysconfdir}/libvirt/virtnwfilterd.conf
+%{_datadir}/augeas/lenses/virtnwfilterd.aug
+%{_datadir}/augeas/lenses/tests/test_virtnwfilterd.aug
+%{_unitdir}/virtnwfilterd.service
+%{_unitdir}/virtnwfilterd.socket
+%{_unitdir}/virtnwfilterd-ro.socket
+%{_unitdir}/virtnwfilterd-admin.socket
+%attr(0755, root, root) %{_sbindir}/virtnwfilterd
 %dir %attr(0700, root, root) %{_sysconfdir}/libvirt/nwfilter/
-%ghost %dir %{_localstatedir}/run/libvirt/network/
+%ghost %dir %{_rundir}/libvirt/network/
 %{_libdir}/%{name}/connection-driver/libvirt_driver_nwfilter.so
 
 %files daemon-driver-secret
+%config(noreplace) %{_sysconfdir}/libvirt/virtsecretd.conf
+%{_datadir}/augeas/lenses/virtsecretd.aug
+%{_datadir}/augeas/lenses/tests/test_virtsecretd.aug
+%{_unitdir}/virtsecretd.service
+%{_unitdir}/virtsecretd.socket
+%{_unitdir}/virtsecretd-ro.socket
+%{_unitdir}/virtsecretd-admin.socket
+%attr(0755, root, root) %{_sbindir}/virtsecretd
 %{_libdir}/%{name}/connection-driver/libvirt_driver_secret.so
 
 %files daemon-driver-storage
 
 %files daemon-driver-storage-core
+%config(noreplace) %{_sysconfdir}/libvirt/virtstoraged.conf
+%{_datadir}/augeas/lenses/virtstoraged.aug
+%{_datadir}/augeas/lenses/tests/test_virtstoraged.aug
+%{_unitdir}/virtstoraged.service
+%{_unitdir}/virtstoraged.socket
+%{_unitdir}/virtstoraged-ro.socket
+%{_unitdir}/virtstoraged-admin.socket
+%attr(0755, root, root) %{_sbindir}/virtstoraged
 %attr(0755, root, root) %{_libexecdir}/libvirt_parthelper
 %{_libdir}/%{name}/connection-driver/libvirt_driver_storage.so
 %{_libdir}/%{name}/storage-backend/libvirt_storage_backend_fs.so
@@ -1677,12 +1756,20 @@ exit 0
 
 %if %{with_qemu}
 %files daemon-driver-qemu
+%config(noreplace) %{_sysconfdir}/libvirt/virtqemud.conf
+%{_datadir}/augeas/lenses/virtqemud.aug
+%{_datadir}/augeas/lenses/tests/test_virtqemud.aug
+%{_unitdir}/virtqemud.service
+%{_unitdir}/virtqemud.socket
+%{_unitdir}/virtqemud-ro.socket
+%{_unitdir}/virtqemud-admin.socket
+%attr(0755, root, root) %{_sbindir}/virtqemud
 %dir %attr(0700, root, root) %{_sysconfdir}/libvirt/qemu/
 %dir %attr(0700, root, root) %{_localstatedir}/log/libvirt/qemu/
 %config(noreplace) %{_sysconfdir}/libvirt/qemu.conf
 %config(noreplace) %{_sysconfdir}/libvirt/qemu-lockd.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/libvirtd.qemu
-%ghost %dir %{_localstatedir}/run/libvirt/qemu/
+%ghost %dir %{_rundir}/libvirt/qemu/
 %dir %attr(0751, %{qemu_user}, %{qemu_group}) %{_localstatedir}/lib/libvirt/qemu/
 %dir %attr(0750, %{qemu_user}, %{qemu_group}) %{_localstatedir}/cache/libvirt/qemu/
 %{_datadir}/augeas/lenses/libvirtd_qemu.aug
@@ -1694,10 +1781,18 @@ exit 0
 
 %if %{with_lxc}
 %files daemon-driver-lxc
+%config(noreplace) %{_sysconfdir}/libvirt/virtlxcd.conf
+%{_datadir}/augeas/lenses/virtlxcd.aug
+%{_datadir}/augeas/lenses/tests/test_virtlxcd.aug
+%{_unitdir}/virtlxcd.service
+%{_unitdir}/virtlxcd.socket
+%{_unitdir}/virtlxcd-ro.socket
+%{_unitdir}/virtlxcd-admin.socket
+%attr(0755, root, root) %{_sbindir}/virtlxcd
 %dir %attr(0700, root, root) %{_localstatedir}/log/libvirt/lxc/
 %config(noreplace) %{_sysconfdir}/libvirt/lxc.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/libvirtd.lxc
-%ghost %dir %{_localstatedir}/run/libvirt/lxc/
+%ghost %dir %{_rundir}/libvirt/lxc/
 %dir %attr(0700, root, root) %{_localstatedir}/lib/libvirt/lxc/
 %{_datadir}/augeas/lenses/libvirtd_lxc.aug
 %{_datadir}/augeas/lenses/tests/test_libvirtd_lxc.aug
@@ -1707,19 +1802,35 @@ exit 0
 
 %if %{with_libxl}
 %files daemon-driver-libxl
+%config(noreplace) %{_sysconfdir}/libvirt/virtxend.conf
+%{_datadir}/augeas/lenses/virtxend.aug
+%{_datadir}/augeas/lenses/tests/test_virtxend.aug
+%{_unitdir}/virtxend.service
+%{_unitdir}/virtxend.socket
+%{_unitdir}/virtxend-ro.socket
+%{_unitdir}/virtxend-admin.socket
+%attr(0755, root, root) %{_sbindir}/virtxend
 %config(noreplace) %{_sysconfdir}/libvirt/libxl.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/libvirtd.libxl
 %config(noreplace) %{_sysconfdir}/libvirt/libxl-lockd.conf
 %{_datadir}/augeas/lenses/libvirtd_libxl.aug
 %{_datadir}/augeas/lenses/tests/test_libvirtd_libxl.aug
 %dir %attr(0700, root, root) %{_localstatedir}/log/libvirt/libxl/
-%ghost %dir %{_localstatedir}/run/libvirt/libxl/
+%ghost %dir %{_rundir}/libvirt/libxl/
 %dir %attr(0700, root, root) %{_localstatedir}/lib/libvirt/libxl/
 %{_libdir}/%{name}/connection-driver/libvirt_driver_libxl.so
 %endif
 
 %if %{with_vbox}
 %files daemon-driver-vbox
+%config(noreplace) %{_sysconfdir}/libvirt/virtvboxd.conf
+%{_datadir}/augeas/lenses/virtvboxd.aug
+%{_datadir}/augeas/lenses/tests/test_virtvboxd.aug
+%{_unitdir}/virtvboxd.service
+%{_unitdir}/virtvboxd.socket
+%{_unitdir}/virtvboxd-ro.socket
+%{_unitdir}/virtvboxd-admin.socket
+%attr(0755, root, root) %{_sbindir}/virtvboxd
 %{_libdir}/%{name}/connection-driver/libvirt_driver_vbox.so
 %endif
 
@@ -1847,6 +1958,7 @@ exit 0
 %if %{with_lxc}
 %files login-shell
 %attr(4750, root, virtlogin) %{_bindir}/virt-login-shell
+%{_libexecdir}/virt-login-shell-helper
 %config(noreplace) %{_sysconfdir}/libvirt/virt-login-shell.conf
 %{_mandir}/man1/virt-login-shell.1*
 %endif
@@ -1888,6 +2000,9 @@ exit 0
 
 
 %changelog
+* Tue Sep 03 2019 Cole Robinson <crobinso@redhat.com> - 5.7.0-1
+- Update to version 5.7.0
+
 * Tue Aug 06 2019 Cole Robinson <crobinso@redhat.com> - 5.6.0-1
 - Update to version 5.6.0
 
