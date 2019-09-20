@@ -216,7 +216,7 @@
 Summary: Library providing a simple virtualization API
 Name: libvirt
 Version: 5.7.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -224,6 +224,9 @@ URL: https://libvirt.org/
     %define mainturl stable_updates/
 %endif
 Source: https://libvirt.org/sources/%{?mainturl}libvirt-%{version}.tar.xz
+
+# Fix systemd socket activation with TLS socket
+Patch0001: 0001-remote-fix-registration-of-TLS-socket.patch
 
 Requires: libvirt-daemon = %{version}-%{release}
 Requires: libvirt-daemon-config-network = %{version}-%{release}
@@ -2000,6 +2003,9 @@ exit 0
 
 
 %changelog
+* Fri Sep 20 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.7.0-2
+- Fix systemd socket activation with TLS socket
+
 * Tue Sep 03 2019 Cole Robinson <crobinso@redhat.com> - 5.7.0-1
 - Update to version 5.7.0
 
