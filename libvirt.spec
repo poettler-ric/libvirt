@@ -216,7 +216,7 @@
 Summary: Library providing a simple virtualization API
 Name: libvirt
 Version: 5.7.0
-Release: 2%{?dist}
+Release: 3%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
 
@@ -227,6 +227,9 @@ Source: https://libvirt.org/sources/%{?mainturl}libvirt-%{version}.tar.xz
 
 # Fix systemd socket activation with TLS socket
 Patch0001: 0001-remote-fix-registration-of-TLS-socket.patch
+# Fix VM startup when legacy cgroups are defined (bz #1612383)
+Patch0002: 0002-vircgroupv2-Fix-VM-startup-when-legacy-cgroups-are-d.patch
+Patch0003: 0003-vircgroup-Add-some-VIR_DEBUG-statements.patch
 
 Requires: libvirt-daemon = %{version}-%{release}
 Requires: libvirt-daemon-config-network = %{version}-%{release}
@@ -2003,6 +2006,9 @@ exit 0
 
 
 %changelog
+* Thu Sep 26 2019 Cole Robinson <crobinso@redhat.com> - 5.7.0-3
+- Fix VM startup when legacy cgroups are defined (bz #1612383)
+
 * Fri Sep 20 2019 Daniel P. Berrangé <berrange@redhat.com> - 5.7.0-2
 - Fix systemd socket activation with TLS socket
 
